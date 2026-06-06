@@ -1,9 +1,9 @@
-"""Local LLM backend — calls OpenAI directly so no MuAPI account is needed."""
-from ..config import OPENAI_MODEL, require_openai_key
+"""Local LLM backend — usa Groq (OpenAI-compatible) ou OpenAI direto."""
+import os
 
 
 def call_openai_llm(prompt: str) -> str:
-    """OpenAI Chat Completions backend used by --mode local."""
+    """Chat Completions backend. Usa Groq se GROQ_API_KEY estiver setada, senão OpenAI."""
     try:
         from openai import OpenAI  # type: ignore
     except ImportError as e:
@@ -12,9 +12,21 @@ def call_openai_llm(prompt: str) -> str:
             "    pip install -r requirements-local.txt"
         ) from e
 
-    client = OpenAI(api_key=require_openai_key())
+    groq_key = os.getenv("GROQ_API_KEY", "").strip()
+    if groq_key:
+        client = OpenAI(api_key=groq_key, base_url="https://api.groq.com/openai/v1")
+        model = os.getenv("OPENAI_MODEL", "llama-3.3-70b-versatile")
+    else:
+        openai_key = os.getenv("OPENAI_API_KEY", "").strip()
+        if not openai_key:
+            raise RuntimeError(
+                "Defina GROQ_API_KEY (recomendado) ou OPENAI_API_KEY no .env."
+            )
+        client = OpenAI(api_key=openai_key)
+        model = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+
     response = client.chat.completions.create(
-        model=OPENAI_MODEL,
+        model=model,
         temperature=0.7,
         messages=[{"role": "user", "content": prompt}],
     )
